@@ -1,6 +1,43 @@
 import json
+import io
+import base64
+import pypdfium2 as pdfium
+from PIL import Image
 from config import get_groq_client, VISION_MODEL
-from utils import encode_image_to_base64
+
+def process_drawing_file(file_buffer):
+    """
+    Helper function: Accepts an uploaded file buffer (PNG, JPG, or PDF).
+    If PDF, converts the first page to a high-res PNG image.
+    Returns a valid Data URL string for Groq Vision API.
+    """
+    if not file_buffer:
+        return None
+
+    file_name = getattr(file_buffer, 'name', '').lower()
+
+    if hasattr(file_buffer, 'seek'):
+        file_buffer.seek(0)
+
+    # 1. Handle PDF Drawings
+    if file_name.endswith('.pdf'):
+        pdf = pdfium.PdfDocument(file_buffer)
+        first_page = pdf[0]
+        # Render at 200 DPI for high architectural clarity
+        rendered_img = first_page.render(scale=200 / 72).to_pil()
+
+        img_byte_arr = io.BytesIO()
+        rendered_img.save(img_byte_arr, format='PNG')
+        encoded_string = base64.b64encode(img_byte_arr.getvalue()).decode('utf-8')
+        return f"data:image/png;base64,{encoded_string}"
+
+    # 2. Handle PNG, JPG, JPEG Images
+    else:
+        file_bytes = file_buffer.read()
+        encoded_string = base64.b64encode(file_bytes).decode('utf-8')
+        mime_type = "image/png" if file_name.endswith('.png') else "image/jpeg"
+        return f"data:{mime_type};base64,{encoded_string}"
+
 
 def analyze_drawing(image_file):
     """
@@ -8,10 +45,11 @@ def analyze_drawing(image_file):
     """
     return analyze_drawing_comparison(image_file, None)
 
+
 def analyze_drawing_comparison(old_img_file, new_img_file=None):
     """
     Uses Groq Multimodal Vision Model to inspect single or dual architectural drawings.
-    Compares Old vs Revised drawings when both are provided.
+    Supports PNG, JPG, and PDF formats seamlessly.
     """
     if not old_img_file and not new_img_file:
         return "No drawing files provided for visual verification."
@@ -21,7 +59,7 @@ def analyze_drawing_comparison(old_img_file, new_img_file=None):
     # Case 1: Single Drawing Uploaded
     if not old_img_file or not new_img_file:
         single_img = old_img_file or new_img_file
-        base64_image = encode_image_to_base64(single_img)
+        data_url = process_drawing_file(single_img)
 
         prompt = """
         You are an expert Civil & Architectural Drawing Inspector.
@@ -45,7 +83,7 @@ def analyze_drawing_comparison(old_img_file, new_img_file=None):
                         {
                             "type": "image_url",
                             "image_url": {
-                                "url": f"data:image/jpeg;base64,{base64_image}"
+                                "url": data_url
                             }
                         }
                     ]
@@ -57,8 +95,8 @@ def analyze_drawing_comparison(old_img_file, new_img_file=None):
         return response.choices[0].message.content
 
     # Case 2: Dual Drawing Comparison (Old vs. Revised)
-    old_b64 = encode_image_to_base64(old_img_file)
-    new_b64 = encode_image_to_base64(new_img_file)
+    old_data_url = process_drawing_file(old_img_file)
+    new_data_url = process_drawing_file(new_img_file)
 
     comparison_prompt = """
     You are an expert Civil & Architectural Drawing Inspector for CONSTRIQ.
@@ -82,13 +120,13 @@ def analyze_drawing_comparison(old_img_file, new_img_file=None):
                     {
                         "type": "image_url",
                         "image_url": {
-                            "url": f"data:image/jpeg;base64,{old_b64}"
+                            "url": old_data_url
                         }
                     },
                     {
                         "type": "image_url",
                         "image_url": {
-                            "url": f"data:image/jpeg;base64,{new_b64}"
+                            "url": new_data_url
                         }
                     }
                 ]
