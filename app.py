@@ -12,8 +12,14 @@ st.title("🏗️ CONSTRIQ")
 st.caption("Smart Dual-BOQ PDF & Drawing Change Analyzer (Powered by Groq)")
 
 st.sidebar.header("📁 Document Uploads")
-old_boq_file = st.sidebar.file_uploader("1. Upload Old BOQ (PDF)", type=["pdf"])
-new_boq_file = st.sidebar.file_uploader("2. Upload New BOQ with Changes (PDF)", type=["pdf"])
+old_boq_file = st.sidebar.file_uploader(
+    "1. Upload Old BOQ (CSV, XLSX, or PDF)", 
+    type=["csv", "xlsx", "pdf"]
+)
+new_boq_file = st.sidebar.file_uploader(
+    "2. Upload New BOQ with Changes (CSV, XLSX, or PDF)", 
+    type=["csv", "xlsx", "pdf"]
+)
 drawing_file = st.sidebar.file_uploader("3. Upload Drawing/Diagram (Optional)", type=["png", "jpg", "jpeg"])
 
 st.subheader("✍️ Optional Scope Notes")
