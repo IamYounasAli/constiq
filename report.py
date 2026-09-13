@@ -5,9 +5,21 @@ from utils import format_currency
 def render_dashboard(calc_results, risk_data, drawing_notes=None):
     """
     Renders clean Streamlit output widgets for the complete CONSTRIQ summary.
+    Includes AI Confidence scoring and User Verification points (MVP Features 10 & 11).
     """
     st.divider()
     st.header("📊 Executive Impact Dashboard")
+    
+    # Feature 10 & 11: AI Confidence & User Verification Point
+    confidence = risk_data.get("confidence_score", "HIGH")
+    reasoning = risk_data.get("confidence_reasoning", "Standard parametric match applied.")
+    
+    if confidence == "LOW":
+        st.warning(f"⚠️ **Low AI Confidence Detected:** {reasoning}\n\n*Action Required:* Please manually verify the BOQ line items below before finalizing decisions.")
+    elif confidence == "MEDIUM":
+        st.info(f"🟡 **Medium AI Confidence:** {reasoning}")
+    else:
+        st.success(f"🎯 **High AI Confidence Rating:** {reasoning}")
     
     # 1. KPI Top Cards
     c1, c2, c3 = st.columns(3)
