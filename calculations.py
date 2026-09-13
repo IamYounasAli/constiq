@@ -4,6 +4,7 @@ def compute_boq_variances(parsed_json, boq_df):
     """
     Pure Python calculation core.
     Computes exact Old Qty, New Qty, Delta Qty, and Delta Cost.
+    Compatible with both single BOQ and Dual-PDF BOQ workflows.
     """
     results = []
     total_cost_impact = 0.0
@@ -13,7 +14,7 @@ def compute_boq_variances(parsed_json, boq_df):
     for item in affected_items:
         item_id = str(item.get("item_id", "")).strip()
         
-        # Try finding match in provided BOQ DataFrame
+        # Match with provided BOQ DataFrame if available
         boq_matches = pd.DataFrame()
         if boq_df is not None and not boq_df.empty and 'item_id' in boq_df.columns:
             boq_matches = boq_df[boq_df['item_id'].astype(str).str.strip() == item_id]
@@ -49,7 +50,8 @@ def compute_boq_variances(parsed_json, boq_df):
             "old_qty": old_q,
             "new_qty": new_q,
             "delta_qty": delta_q,
-            "cost_impact": delta_cost
+            "cost_impact": delta_cost,  # Keeps report.py working smoothly
+            "delta_cost": delta_cost
         })
         
     return {
