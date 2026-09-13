@@ -18,6 +18,8 @@ def parse_pdf_boq_changes(old_boq_text, new_boq_text, drawing_context=""):
     
     Return pure valid JSON matching this schema:
     {
+      "confidence_score": "HIGH" | "MEDIUM" | "LOW",
+      "confidence_reasoning": "Brief justification for the confidence rating based on document clarity, legibility, and matching precision",
       "change_summary": "Brief summary of changes found between BOQs",
       "affected_items": [
         {
