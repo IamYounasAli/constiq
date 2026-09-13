@@ -1,45 +1,73 @@
 import pandas as pd
+import pypdf
 
-def load_boq_data(file_path_or_buffer):
-    """
-    Reads CSV or Excel BOQ file into a normalized Pandas DataFrame.
-    Expected columns: item_id, description, unit, rate, current_qty
-    """
-    try:
-        if hasattr(file_path_or_buffer, 'name'):
-            if file_path_or_buffer.name.endswith('.csv'):
-                df = pd.read_csv(file_path_or_buffer)
-            else:
-                df = pd.read_excel(file_path_or_buffer)
-        else:
-            if str(file_path_or_buffer).endswith('.csv'):
-                df = pd.read_csv(file_path_or_buffer)
-            else:
-                df = pd.read_excel(file_path_or_buffer)
-                
-        # Column name normalization
-        df.columns = df.columns.str.strip().str.lower().str.replace(' ', '_')
-        
-        required_cols = ['item_id', 'description', 'unit', 'rate', 'current_qty']
-        for col in required_cols:
-            if col not in df.columns:
-                raise ValueError(f"Missing required column in BOQ: '{col}'")
-                
-        df['rate'] = pd.to_numeric(df['rate'], errors='coerce').fillna(0.0)
-        df['current_qty'] = pd.to_numeric(df['current_qty'], errors='coerce').fillna(0.0)
-        
-        return df
-    except Exception as e:
-        raise Exception(f"Failed to parse BOQ file: {str(e)}")
+def extract_text_from_pdf(pdf_file) -> str:
+    """Extracts raw text content from an uploaded PDF BOQ."""
+    reader = pypdf.PdfReader(pdf_file)
+    extracted_text = ""
+    for idx, page in enumerate(reader.pages):
+        text = page.extract_text()
+        if text:
+            extracted_text += f"\n--- Page {idx + 1} ---\n" + text
+    return extracted_text
 
-def get_boq_summary_list(df):
-    """Returns a simplified list of items for LLM prompt context."""
-    items = []
-    for _, row in df.iterrows():
-        items.append({
-            "item_id": str(row['item_id']),
-            "description": str(row['description']),
-            "unit": str(row['unit']),
-            "rate": float(row['rate'])
-        })
-    return items
+def parse_pdf_boq_to_df(pdf_file) -> pd.DataFrame:
+    """Parses BOQ PDF text into a structured Pandas DataFrame."""
+    raw_text = extract_text_from_pdf(pdf_file)
+    lines = raw_text.splitlines()
+    
+    records = []
+    for line in lines:
+        parts = line.strip().split()
+        if len(parts) >= 4:
+            try:
+                qty = float(parts[-1].replace(',', ''))
+                rate = float(parts[-2].replace(',', ''))
+                unit = parts[-3]
+                item_id = parts[0]
+                description = " ".join(parts[1:-3])
+                if description:
+                    records.append({
+                        "item_id": item_id,
+                        "description": description,
+                        "unit": unit,
+                        "rate": rate,
+                        "current_qty": qty
+                    })
+            except (ValueError, IndexError):
+                continue
+                
+    if records:
+        return pd.DataFrame(records)
+    
+    return pd.DataFrame(columns=["item_id", "description", "unit", "rate", "current_qty"])
+
+def load_boq_data(uploaded_file) -> pd.DataFrame:
+    """Loads BOQ from CSV, Excel, or PDF."""
+    filename = uploaded_file.name.lower()
+    if filename.endswith('.csv'):
+        df = pd.read_csv(uploaded_file)
+    elif filename.endswith(('.xls', '.xlsx')):
+        df = pd.read_excel(uploaded_file)
+    elif filename.endswith('.pdf'):
+        df = parse_pdf_boq_to_df(uploaded_file)
+    else:
+        raise ValueError("Unsupported file format.")
+    
+    df.columns = df.columns.str.strip().str.lower().str.replace(' ', '_')
+    return df
+
+def compare_boq_pdfs(old_pdf, new_pdf):
+    """Parses both Old and New PDF BOQs and extracts their content."""
+    old_df = load_boq_data(old_pdf)
+    new_df = load_boq_data(new_pdf)
+    
+    old_text = extract_text_from_pdf(old_pdf)
+    new_text = extract_text_from_pdf(new_pdf)
+    
+    return {
+        "old_df": old_df,
+        "new_df": new_df,
+        "old_text": old_text,
+        "new_text": new_text
+    }
