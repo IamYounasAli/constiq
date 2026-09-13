@@ -22,12 +22,11 @@ def compute_boq_variances(parsed_json, boq_df):
             old_q = (item.get("old_dim_a") or 0.0) * (item.get("old_dim_b") or 0.0)
             new_q = (item.get("new_dim_a") or 0.0) * (item.get("new_dim_b") or 0.0)
         elif calc_type == "direct_qty":
-            # Supports both single-BOQ text extraction and dual-PDF keys
-            old_q = float(item.get("old_qty") or item.get("old_direct_qty") or boq_row['current_qty'])
-            new_q = float(item.get("new_qty") or item.get("new_direct_qty") or 0.0)
+            old_q = float(item.get("old_direct_qty") or boq_row['current_qty'])
+            new_q = float(item.get("new_direct_qty") or 0.0)
         else:
             old_q = float(boq_row['current_qty'])
-            new_q = float(item.get("new_qty") or item.get("new_direct_qty") or old_q)
+            new_q = float(item.get("new_direct_qty") or old_q)
             
         delta_q = new_q - old_q
         rate = float(boq_row['rate'])
