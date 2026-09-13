@@ -23,9 +23,16 @@ new_boq_file = st.sidebar.file_uploader(
 )
 
 st.sidebar.header("🖼️ Drawing Uploads (Optional)")
-old_drawing = st.sidebar.file_uploader("Upload Old Drawing", type=["png", "jpg", "jpeg"], key="old_draw")
-new_drawing = st.sidebar.file_uploader("Upload Revised Drawing", type=["png", "jpg", "jpeg"], key="new_draw")
-
+old_drawing = st.sidebar.file_uploader(
+    "Upload Old Drawing (PNG, JPG, PDF)", 
+    type=["png", "jpg", "jpeg", "pdf"], 
+    key="old_draw"
+)
+new_drawing = st.sidebar.file_uploader(
+    "Upload Revised Drawing (PNG, JPG, PDF)", 
+    type=["png", "jpg", "jpeg", "pdf"], 
+    key="new_draw"
+)
 # 2. Scope Notes Input
 st.subheader("✍️ Optional Scope Notes")
 user_notes = st.text_area(
