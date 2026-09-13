@@ -62,7 +62,7 @@ if st.button("🚀 ANALYZE DIFFERENCES & RIPPLE IMPACT", type="primary", use_con
                 
                 # Step 4: Deterministic Mathematical Computations
                 st.toast("Computing precise financial & quantity variances...", icon="🔢")
-                calc_results = compute_boq_variances(parsed_changes, boq_data["old_df"])
+                calc_results = compute_boq_variances(parsed_changes, boq_data.get("old_df"))
                 
                 # Step 5: Risk Assessment & Confidence Synthesis
                 st.toast("Synthesizing downstream schedule & trade risks...", icon="⚠️")
@@ -72,8 +72,18 @@ if st.button("🚀 ANALYZE DIFFERENCES & RIPPLE IMPACT", type="primary", use_con
                     confidence_data=parsed_changes
                 )
                 
-                # Step 6: Render Interactive Dashboard
-                render_dashboard(calc_results, risk_summary, drawing_notes)
+                # Save to session state to prevent loss on user interactions
+                st.session_state["calc_results"] = calc_results
+                st.session_state["risk_summary"] = risk_summary
+                st.session_state["drawing_notes"] = drawing_notes
                 
             except Exception as e:
                 st.error(f"An error occurred during analysis: {str(e)}")
+
+# Step 6: Render Dashboard if results exist in memory
+if "calc_results" in st.session_state and "risk_summary" in st.session_state:
+    render_dashboard(
+        st.session_state["calc_results"], 
+        st.session_state["risk_summary"], 
+        st.session_state.get("drawing_notes")
+    )
