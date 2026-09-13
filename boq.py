@@ -1,73 +1,70 @@
 import pandas as pd
 import pypdf
 
-def extract_text_from_pdf(pdf_file) -> str:
-    """Extracts raw text content from an uploaded PDF BOQ."""
-    reader = pypdf.PdfReader(pdf_file)
-    extracted_text = ""
-    for idx, page in enumerate(reader.pages):
-        text = page.extract_text()
-        if text:
-            extracted_text += f"\n--- Page {idx + 1} ---\n" + text
-    return extracted_text
-
-def parse_pdf_boq_to_df(pdf_file) -> pd.DataFrame:
-    """Parses BOQ PDF text into a structured Pandas DataFrame."""
-    raw_text = extract_text_from_pdf(pdf_file)
-    lines = raw_text.splitlines()
-    
-    records = []
-    for line in lines:
-        parts = line.strip().split()
-        if len(parts) >= 4:
-            try:
-                qty = float(parts[-1].replace(',', ''))
-                rate = float(parts[-2].replace(',', ''))
-                unit = parts[-3]
-                item_id = parts[0]
-                description = " ".join(parts[1:-3])
-                if description:
-                    records.append({
-                        "item_id": item_id,
-                        "description": description,
-                        "unit": unit,
-                        "rate": rate,
-                        "current_qty": qty
-                    })
-            except (ValueError, IndexError):
-                continue
+def parse_pdf_boq_to_df(file_buffer):
+    """Extracts text/tables from a PDF BOQ and converts it into a DataFrame."""
+    try:
+        reader = pypdf.PdfReader(file_buffer)
+        extracted_text = ""
+        for page in reader.pages:
+            text = page.extract_text()
+            if text:
+                extracted_text += text + "\n"
                 
-    if records:
-        return pd.DataFrame(records)
-    
-    return pd.DataFrame(columns=["item_id", "description", "unit", "rate", "current_qty"])
+        lines = [line.strip() for line in extracted_text.split('\n') if line.strip()]
+        rows = []
+        for line in lines:
+            parts = line.split(',') if ',' in line else line.split('\t')
+            if len(parts) >= 5:
+                rows.append(parts[:5])
+                
+        if rows:
+            return pd.DataFrame(rows[1:], columns=rows[0])
+    except Exception:
+        pass
+        
+    return pd.DataFrame(columns=['item_id', 'description', 'unit', 'rate', 'current_qty'])
 
-def load_boq_data(uploaded_file) -> pd.DataFrame:
-    """Loads BOQ from CSV, Excel, or PDF."""
-    filename = uploaded_file.name.lower()
-    if filename.endswith('.csv'):
-        df = pd.read_csv(uploaded_file)
-    elif filename.endswith(('.xls', '.xlsx')):
-        df = pd.read_excel(uploaded_file)
-    elif filename.endswith('.pdf'):
-        df = parse_pdf_boq_to_df(uploaded_file)
-    else:
-        raise ValueError("Unsupported file format.")
-    
-    df.columns = df.columns.str.strip().str.lower().str.replace(' ', '_')
-    return df
+def load_boq_data(file_path_or_buffer):
+    """
+    Reads CSV, Excel (XLSX), or PDF BOQ files into a normalized Pandas DataFrame.
+    """
+    try:
+        file_name = file_path_or_buffer.name if hasattr(file_path_or_buffer, 'name') else str(file_path_or_buffer)
+        
+        if file_name.endswith('.csv'):
+            df = pd.read_csv(file_path_or_buffer)
+        elif file_name.endswith(('.xlsx', '.xls')):
+            df = pd.read_excel(file_path_or_buffer)
+        elif file_name.endswith('.pdf'):
+            df = parse_pdf_boq_to_df(file_path_or_buffer)
+        else:
+            raise ValueError("Unsupported file format.")
+                
+        df.columns = df.columns.str.strip().str.lower().str.replace(' ', '_')
+        
+        # Ensure all required keys exist to prevent downstream KeyError bugs
+        required_cols = ['item_id', 'description', 'unit', 'rate', 'current_qty']
+        for col in required_cols:
+            if col not in df.columns:
+                df[col] = 0.0 if col in ['rate', 'current_qty'] else "N/A"
+                
+        df['rate'] = pd.to_numeric(df['rate'], errors='coerce').fillna(0.0)
+        df['current_qty'] = pd.to_numeric(df['current_qty'], errors='coerce').fillna(0.0)
+        
+        return df
+    except Exception as e:
+        raise Exception(f"Failed to parse BOQ file: {str(e)}")
 
-def compare_boq_pdfs(old_pdf, new_pdf):
-    """Parses both Old and New PDF BOQs and extracts their content."""
-    old_df = load_boq_data(old_pdf)
-    new_df = load_boq_data(new_pdf)
-    
-    old_text = extract_text_from_pdf(old_pdf)
-    new_text = extract_text_from_pdf(new_pdf)
-    
-    return {
-        "old_df": old_df,
-        "new_df": new_df,
-        "old_text": old_text,
-        "new_text": new_text
-    }
+def get_boq_summary_list(df):
+    """Returns a simplified list of items for LLM prompt context."""
+    items = []
+    if df is not None and not df.empty:
+        for _, row in df.iterrows():
+            items.append({
+                "item_id": str(row.get('item_id', '')),
+                "description": str(row.get('description', '')),
+                "unit": str(row.get('unit', '')),
+                "rate": float(row.get('rate', 0.0))
+            })
+    return items
