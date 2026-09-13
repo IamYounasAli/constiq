@@ -11,33 +11,31 @@ def get_groq_client():
     Safely retrieves the Groq API key from Streamlit secrets or environment variables.
     """
     api_key = None
-    
-    # 1. Check Streamlit secrets
+
+    # 1. Check Streamlit secrets safely
     try:
-        if hasattr(st, "secrets"):
-            if "GROQ_API_KEY" in st.secrets:
-                api_key = st.secrets["GROQ_API_KEY"]
-            elif "groq_api_key" in st.secrets:
-                api_key = st.secrets["groq_api_key"]
-            else:
-                for k, v in st.secrets.items():
-                    if str(k).upper() == "GROQ_API_KEY":
-                        api_key = v
-                        break
+        if "GROQ_API_KEY" in st.secrets:
+            api_key = st.secrets["GROQ_API_KEY"]
+        elif "groq_api_key" in st.secrets:
+            api_key = st.secrets["groq_api_key"]
     except Exception:
         pass
 
     # 2. Fallback to OS environment variable
     if not api_key:
-        api_key = os.environ.get("GROQ_API_KEY") or os.environ.get("groq_api_key")
+        api_key = os.getenv("GROQ_API_KEY") or os.getenv("groq_api_key")
 
-    # Clean any whitespace, newlines, or extra quotes
+    # Clean whitespace and accidental surrounding quotes
     if api_key:
         api_key = str(api_key).strip().strip('"').strip("'")
 
     # 3. Guard check
     if not api_key or api_key == "gsk_your_groq_api_key_here":
-        st.error("⚠️ Groq API Key not found or unconfigured! Please set GROQ_API_KEY in Streamlit Cloud Secrets.")
+        st.error(
+            "⚠️ **Groq API Key not found or unconfigured!**\n\n"
+            "Please open **App Settings > Secrets** in Streamlit Cloud and add:\n"
+            '```toml\nGROQ_API_KEY = "gsk_your_actual_key_here"\n```'
+        )
         st.stop()
 
     return Groq(api_key=api_key)
