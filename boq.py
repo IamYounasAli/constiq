@@ -1,25 +1,45 @@
 import pandas as pd
 import pypdf
 
-def parse_pdf_boq_to_df(file_buffer):
-    """Extracts text/tables from a PDF BOQ and converts it into a DataFrame."""
+def extract_raw_text_from_pdf(file_buffer):
+    """Extracts all raw text page-by-page from a PDF buffer."""
+    extracted_text = ""
     try:
+        if hasattr(file_buffer, 'seek'):
+            file_buffer.seek(0)
         reader = pypdf.PdfReader(file_buffer)
-        extracted_text = ""
         for page in reader.pages:
             text = page.extract_text()
             if text:
                 extracted_text += text + "\n"
-                
-        lines = [line.strip() for line in extracted_text.split('\n') if line.strip()]
+    except Exception as e:
+        extracted_text = f"Error reading PDF text: {str(e)}"
+    finally:
+        if hasattr(file_buffer, 'seek'):
+            file_buffer.seek(0)
+    return extracted_text.strip()
+
+def parse_pdf_boq_to_df(file_buffer):
+    """Attempts structured tabular extraction from PDF, falling back gracefully."""
+    try:
+        raw_text = extract_raw_text_from_pdf(file_buffer)
+        lines = [line.strip() for line in raw_text.split('\n') if line.strip()]
         rows = []
+        
         for line in lines:
+            # Try comma or tab splitting
             parts = line.split(',') if ',' in line else line.split('\t')
-            if len(parts) >= 5:
-                rows.append(parts[:5])
+            # Fallback to multi-space alignment splitting for standard BOQ layouts
+            if len(parts) < 3:
+                parts = [p.strip() for p in line.split('  ') if p.strip()]
+            
+            if len(parts) >= 3:
+                rows.append(parts)
                 
-        if rows:
-            return pd.DataFrame(rows[1:], columns=rows[0])
+        if len(rows) > 1:
+            headers = ['item_id', 'description', 'unit', 'rate', 'current_qty']
+            df = pd.DataFrame(rows[1:], columns=headers[:len(rows[0])])
+            return df
     except Exception:
         pass
         
@@ -32,16 +52,19 @@ def load_boq_data(file_path_or_buffer):
     try:
         file_name = file_path_or_buffer.name if hasattr(file_path_or_buffer, 'name') else str(file_path_or_buffer)
         
-        if file_name.endswith('.csv'):
+        if hasattr(file_path_or_buffer, 'seek'):
+            file_path_or_buffer.seek(0)
+            
+        if file_name.lower().endswith('.csv'):
             df = pd.read_csv(file_path_or_buffer)
-        elif file_name.endswith(('.xlsx', '.xls')):
+        elif file_name.lower().endswith(('.xlsx', '.xls')):
             df = pd.read_excel(file_path_or_buffer)
-        elif file_name.endswith('.pdf'):
+        elif file_name.lower().endswith('.pdf'):
             df = parse_pdf_boq_to_df(file_path_or_buffer)
         else:
             raise ValueError("Unsupported file format.")
                 
-        df.columns = df.columns.str.strip().str.lower().str.replace(' ', '_')
+        df.columns = df.columns.astype(str).str.strip().str.lower().str.replace(' ', '_')
         
         # Ensure all required keys exist to prevent downstream KeyError bugs
         required_cols = ['item_id', 'description', 'unit', 'rate', 'current_qty']
@@ -71,20 +94,26 @@ def get_boq_summary_list(df):
 
 def compare_boq_pdfs(old_boq_file, new_boq_file):
     """
-    Extracts text and structured dataframes from old and new BOQs 
-    (supports CSV, XLSX, and PDF).
+    Extracts raw context strings and structured DataFrames from old and new BOQs.
+    Handles CSV, XLSX, and PDF natively.
     """
     old_df = load_boq_data(old_boq_file)
     new_df = load_boq_data(new_boq_file)
     
-    if hasattr(old_boq_file, 'seek'):
-        old_boq_file.seek(0)
-    if hasattr(new_boq_file, 'seek'):
-        new_boq_file.seek(0)
+    # Extract raw text if files are PDFs; otherwise use stringified DataFrame representation
+    old_name = getattr(old_boq_file, 'name', '').lower()
+    new_name = getattr(new_boq_file, 'name', '').lower()
+
+    if old_name.endswith('.pdf'):
+        old_text = extract_raw_text_from_pdf(old_boq_file)
+    else:
+        old_text = old_df.to_string(index=False)
+
+    if new_name.endswith('.pdf'):
+        new_text = extract_raw_text_from_pdf(new_boq_file)
+    else:
+        new_text = new_df.to_string(index=False)
         
-    old_text = old_df.to_string(index=False)
-    new_text = new_df.to_string(index=False)
-    
     return {
         "old_text": old_text,
         "new_text": new_text,
