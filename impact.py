@@ -1,10 +1,11 @@
 import json
 from config import get_groq_client, TEXT_MODEL
 
-def analyze_ripple_impact(calc_results, change_summary):
+def analyze_ripple_impact(calc_results, change_summary, confidence_data=None):
     """
     Uses openai/gpt-oss-120b on Groq to perform qualitative project management analysis.
     Evaluates downstream schedule, material procurement, trades, and site risks.
+    Attaches confidence ratings (MVP Features 10 & 11) when provided.
     """
     client = get_groq_client()
     
@@ -41,6 +42,16 @@ def analyze_ripple_impact(calc_results, change_summary):
     )
     
     try:
-        return json.loads(response.choices[0].message.content)
+        risk_summary = json.loads(response.choices[0].message.content)
+        
+        # Attach confidence metadata if provided from the BOQ extraction stage
+        if confidence_data and isinstance(confidence_data, dict):
+            risk_summary["confidence_score"] = confidence_data.get("confidence_score", "HIGH")
+            risk_summary["confidence_reasoning"] = confidence_data.get("confidence_reasoning", "Standard parametric extraction applied.")
+        else:
+            risk_summary["confidence_score"] = "HIGH"
+            risk_summary["confidence_reasoning"] = "Standard parametric extraction applied."
+            
+        return risk_summary
     except Exception as e:
         raise Exception(f"Failed to parse Risk Analysis response: {str(e)}")
