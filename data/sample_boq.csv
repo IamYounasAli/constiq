@@ -1,0 +1,6 @@
+item_id,description,unit,rate,current_qty
+101,Ceramic Floor Tiling,sqm,3500,100.0
+102,Cement Plastering 1:4,sqm,1200,250.0
+103,Internal Acrylic Paint,sqm,800,250.0
+104,Brickwork 225mm thick,cum,15000,45.0
+105,Reinforced Concrete M25,cum,22000,30.0
