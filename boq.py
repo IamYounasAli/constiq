@@ -68,3 +68,26 @@ def get_boq_summary_list(df):
                 "rate": float(row.get('rate', 0.0))
             })
     return items
+
+def compare_boq_pdfs(old_boq_file, new_boq_file):
+    """
+    Extracts text and structured dataframes from old and new BOQs 
+    (supports CSV, XLSX, and PDF).
+    """
+    old_df = load_boq_data(old_boq_file)
+    new_df = load_boq_data(new_boq_file)
+    
+    if hasattr(old_boq_file, 'seek'):
+        old_boq_file.seek(0)
+    if hasattr(new_boq_file, 'seek'):
+        new_boq_file.seek(0)
+        
+    old_text = old_df.to_string(index=False)
+    new_text = new_df.to_string(index=False)
+    
+    return {
+        "old_text": old_text,
+        "new_text": new_text,
+        "old_df": old_df,
+        "new_df": new_df
+    }
