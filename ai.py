@@ -1,47 +1,45 @@
 import json
 from config import get_groq_client, TEXT_MODEL
 
-def parse_change_to_parameters(change_description, boq_items, drawing_context=""):
+def parse_pdf_boq_changes(old_boq_text, new_boq_text, drawing_context=""):
     """
-    Uses openai/gpt-oss-120b on Groq to parse text description + drawing notes
-    into structured JSON parameters. DO NOT perform math calculations here.
+    Uses Groq text model to compare Old BOQ text vs New BOQ text
+    and correlate changes with drawing notes.
     """
     client = get_groq_client()
     
     system_prompt = """
-    You are a Construction AI Assistant for CONSTRIQ.
-    Your task is to identify affected BOQ items and extract dimension / quantity shift parameters.
+    You are an expert Quantity Surveyor and Construction AI Assistant for CONSTRIQ.
+    Compare the text from an OLD BOQ PDF and a NEW BOQ PDF, identify all changed items,
+    and correlate them with architectural drawing notes if available.
     
-    CRITICAL RULE: DO NOT CALCULATE COSTS OR FINAL TOTAL QUANTITIES. 
-    Only extract structured initial and target dimensions/quantities.
+    CRITICAL RULE: Extract exact item IDs, descriptions, old quantities, and new quantities.
     
     Return pure valid JSON matching this schema:
     {
-      "change_summary": "Brief explanation of change",
+      "change_summary": "Brief overall summary of revisions identified between the BOQs",
       "affected_items": [
         {
-          "item_id": "BOQ Item ID from provided list",
-          "calculation_type": "area" OR "volume" OR "direct_qty",
-          "old_dim_a": float or null,
-          "old_dim_b": float or null,
-          "new_dim_a": float or null,
-          "new_dim_b": float or null,
-          "old_direct_qty": float or null,
-          "new_direct_qty": float or null
+          "item_id": "BOQ Item ID or matched identifier",
+          "description": "Item description",
+          "unit": "Unit of measurement",
+          "rate": float,
+          "old_qty": float,
+          "new_qty": float
         }
       ]
     }
     """
     
     user_prompt = f"""
-    BOQ Available Items:
-    {json.dumps(boq_items, indent=2)}
+    --- OLD BOQ PDF CONTENT ---
+    {old_boq_text[:4000]}
     
-    Drawing Vision Analysis Notes:
-    {drawing_context if drawing_context else "No drawing provided."}
+    --- NEW BOQ PDF CONTENT ---
+    {new_boq_text[:4000]}
     
-    User Change Description:
-    "{change_description}"
+    --- DRAWING VISION NOTES ---
+    {drawing_context if drawing_context else "No drawing diagram provided."}
     """
     
     response = client.chat.completions.create(
