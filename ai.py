@@ -4,7 +4,7 @@ from config import get_groq_client, TEXT_MODEL
 def parse_pdf_boq_changes(old_boq_text, new_boq_text, drawing_context=""):
     """
     Uses Groq text model to compare Old BOQ text vs New BOQ text
-    and correlate changes with drawing notes.
+    and extract line item changes into structured parameters.
     """
     client = get_groq_client()
     
@@ -13,19 +13,21 @@ def parse_pdf_boq_changes(old_boq_text, new_boq_text, drawing_context=""):
     Compare the text from an OLD BOQ PDF and a NEW BOQ PDF, identify all changed items,
     and correlate them with architectural drawing notes if available.
     
-    CRITICAL RULE: Extract exact item IDs, descriptions, old quantities, and new quantities.
+    CRITICAL RULE: DO NOT CALCULATE TOTAL COSTS. Only extract line item IDs, descriptions, 
+    and direct old vs new quantities.
     
     Return pure valid JSON matching this schema:
     {
-      "change_summary": "Brief overall summary of revisions identified between the BOQs",
+      "change_summary": "Brief summary of changes found between BOQs",
       "affected_items": [
         {
-          "item_id": "BOQ Item ID or matched identifier",
+          "item_id": "BOQ Item ID string",
           "description": "Item description",
           "unit": "Unit of measurement",
-          "rate": float,
-          "old_qty": float,
-          "new_qty": float
+          "rate": 0.0,
+          "calculation_type": "direct_qty",
+          "old_qty": 0.0,
+          "new_qty": 0.0
         }
       ]
     }
